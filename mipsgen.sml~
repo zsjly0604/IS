@@ -1,0 +1,4 @@
+structure MipsGen :> CODEGEN = 
+struct
+
+fun munchStm(Tree.SEQ(a, b)) = (munchStm a; munchStm b;)

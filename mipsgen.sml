@@ -49,9 +49,9 @@ fun codegen (stm:T.stm) : A.instr list =
 	| munchStm (T.JUMP(e, labs)) = emit(A.OPER{assem = "jr 's0\n", 
                                                    src = [munchExp e],dst = [], jump = SOME(labs)})
         (*comditional branch*)
-	| munchStm (T.CJUMP(T.GE, e, T.CONST 0, l1, l2)) = emit(A.OPER{assem = "bgez 's0, 'j0\n b 'j1\n",
+	| munchStm (T.CJUMP(T.GE, e, T.CONST 0, l1, l2)) = emit(A.OPER{assem = "bgez 's0, 'j0\nb 'j1\n",
                                                                         src = [munchExp e], dst = [], jump = SOME([l1, l2])})
-	| munchStm (T.CJUMP(T.GT, e, T.CONST 0, l1, l2)) = emit(A.OPER{assem = "bgtz 's0, 'j0\n b 'j1\n",
+	| munchStm (T.CJUMP(T.GT, e, T.CONST 0, l1, l2)) = emit(A.OPER{assem = "bgtz 's0, 'j0\nb 'j1\n",
                                                                         src = [munchExp e], dst = [], jump = SOME([l1, l2])})    
 	| munchStm (T.CJUMP(T.LE, e, T.CONST 0, l1, l2)) = emit(A.OPER{assem = "blez 's0, 'j0\n b 'j1\n",
                                                                         src = [munchExp e], dst = [], jump = SOME([l1, l2])})

@@ -80,10 +80,10 @@ fun codegen (stm:T.stm) : A.instr list =
                 fun fetch (a, r) = T.MOVE(T.TEMP r, T.TEMP a)
                 fun store (a, r) = T.MOVE(T.TEMP a, T.TEMP r)
             in
-              map(fn (a, r) => munchStm(store(a, r))) pairs;
+              app (fn (a, r) => munchStm(store(a, r))) pairs;
               emit(A.OPER{assem = "jalr 's0",
                           src = munchExp(e)::munchArgs(0, args), dst = calldefs, jump = NONE});
-              map (fn (a, r) => munchStm(fetch(a, r))) (List.rev pairs);
+              app (fn (a, r) => munchStm(fetch(a, r))) (List.rev pairs);
               ()
             end
 	| munchStm (T.EXP e) = (munchExp e;())
@@ -145,10 +145,10 @@ src = [munchExp e1, munchExp e2],dst = [r],jump = NONE}))
                 fun fetch (a, r) = T.MOVE(T.TEMP r, T.TEMP a)
                 fun store (a, r) = T.MOVE(T.TEMP a, T.TEMP r)
             in
-              map (fn (a, r) => munchStm(store(a, r))) pairs;
+              app (fn (a, r) => munchStm(store(a, r))) pairs;
               result(fn r => emit(A.OPER{assem = "jalr 's0",
                           src = munchExp(e)::munchArgs(0, args), dst = calldefs, jump = NONE}));
-              map (fn (a, r) => munchStm(fetch(a, r))) (List.rev(pairs));
+              app (fn (a, r) => munchStm(fetch(a, r))) (List.rev(pairs));
               Frame.RV
             end 
         | munchExp (T.MEM(e)) = result(fn r => emit(A.OPER{assem = "lw 'd0, 0('s0)\n",

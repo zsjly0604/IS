@@ -9,14 +9,14 @@ structure Main = struct
 
  fun emitproc out (F.PROC{body,frame}) =
    let val _ = print ("emit " ^ Symbol.name (F.name frame) ^ "\n")
-(*     val _ = Printtree.printtree(out,body); *)
+       (*val _ = Printtree.printtree(out,body);*)
         val stms = Canon.linearize body
-(*         val _ = app (fn s => Printtree.printtree(out,s)) stms; *)
+         val _ = app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms;
          val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
 	 val instrs =   List.concat(map MipsGen.codegen stms') 
          val format0 = A.format(Temp.makestring)
       in  
-          app (fn i => TextIO.output(out,format0 i)) instrs
+          app (fn i => TextIO.output(TextIO.stdOut,format0 i)) instrs
        end
     | emitproc out (F.STRING(lab,s)) = TextIO.output(out,s)
 

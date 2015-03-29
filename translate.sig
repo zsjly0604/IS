@@ -1,6 +1,5 @@
 signature TRANSLATE =
 sig
-   
     type access
     type frag
 

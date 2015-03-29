@@ -13,48 +13,51 @@ end
 
 structure Semant :> SEMANT = struct
   structure A = Absyn
+  structure Ty = Types
+  structure Tr = Translate
+
   type venv = Env.enventry Symbol.table
-  type tenv = Types.ty Symbol.table
-  type expty = {exp: Translate.exp, ty: Types.ty}
+  type tenv = Ty.ty Symbol.table
+  type expty = {exp: Tr.exp, ty: Ty.ty}
   val err = ErrorMsg.error
    
-  fun actual_ty (Types.NAME(s, ty)) =
+  fun actual_ty (Ty.NAME(s, ty)) =
     (case !ty of
-         NONE => Types.NAME(s,ty)
+         NONE => Ty.NAME(s,ty)
       | SOME t => actual_ty t)
     | actual_ty t = t 
 
   fun checkInt (ty, pos, des) =
     case ty of
-      Types.INT => true
+      Ty.INT => true
     | _ => (err pos ("Integer required: " ^ des);false)
   
   fun checkString (ty, pos, des) =
     case ty of
-        Types.STRING => true
+        Ty.STRING => true
        |_  => (err pos ("String required: " ^ des);false)
   
   fun checkUnit (ty, pos, des) =
     case ty of
-        Types.UNIT => true
+        Ty.UNIT => true
 	| _ => (err pos ("Unit required: " ^ des);false)
 
   fun checkRecord (ty, pos, des) =
     case ty of
-        Types.RECORD(slist,unique) => true
+        Ty.RECORD(slist,unique) => true
 	| _ => (err pos ("Record required: " ^ des);false)
 
   fun checkArray (ty, pos, des) =
     case ty of
-        Types.ARRAY(ty, unique) => true
+        Ty.ARRAY(ty, unique) => true
 	| _ => (err pos ("Array required: " ^ des);false)
 
   fun compareTypePair (tyspec, tyactual, pos) = 
     let val tyactual' = actual_ty tyactual
         val tyspec' = actual_ty tyspec
     in
-      if tyactual' = Types.NIL then case tyspec' of
-                                        Types.RECORD(slist,unique) => true
+      if tyactual' = Ty.NIL then case tyspec' of
+                                        Ty.RECORD(slist,unique) => true
                                       | _ => false
       else (tyspec' = tyactual')
     end
@@ -66,7 +69,7 @@ structure Semant :> SEMANT = struct
     case Symbol.look(tenv, id) of
        SOME ty => actual_ty ty
      | NONE =>  (err pos ("Undefined Type: " ^ Symbol.name id);
-                 Types.UNIT)
+                 Ty.UNIT)
 
   fun indexOf (a, lst) =
     let fun indexOfAcc(a, [], acc) = ~1
@@ -77,13 +80,13 @@ structure Semant :> SEMANT = struct
        indexOfAcc(a, lst, 0)
     end
  
-  (*fun printType (Types.INT, pos) = err pos "Integer"
-    | printType (Types.STRING, pos) = err pos "String"
-    | printType (Types.ARRAY(ty, unique), pos) = err pos "Array"
-    | printType (Types.RECORD(slist, unique), pos) = err pos "Record"
-    | printType (Types.UNIT, pos) = err pos "Unit"
-    | printType (Types.NAME(n,nref),pos) = err pos "Name"
-    | printType (Types.NIL, pos)= err pos "NIL" *)
+  (*fun printType (Ty.INT, pos) = err pos "Integer"
+    | printType (Ty.STRING, pos) = err pos "String"
+    | printType (Ty.ARRAY(ty, unique), pos) = err pos "Array"
+    | printType (Ty.RECORD(slist, unique), pos) = err pos "Record"
+    | printType (Ty.UNIT, pos) = err pos "Unit"
+    | printType (Ty.NAME(n,nref),pos) = err pos "Name"
+    | printType (Ty.NIL, pos)= err pos "NIL" *)
 
   fun checkname [] = false
     | checkname (name::ns) = (List.exists(fn n => n = name) ns) orelse (checkname ns)
@@ -95,30 +98,30 @@ structure Semant :> SEMANT = struct
                                 checkDups(l))  
         fun recordtys(fields) = map (fn{name, escape, typ, pos} => case SOME(lookType(tenv, typ, pos)) of
                  SOME t => (name, t)
-               | NONE => (name,Types.UNIT)) fields   
+               | NONE => (name,Ty.UNIT)) fields   
     in
       case ty of
         A.NameTy(n, pos) => lookType(tenv, n, pos)
-       | A.RecordTy fields => (checkDups fields; Types.RECORD(recordtys(fields), ref()))
-       | A.ArrayTy(n, pos) => Types.ARRAY(lookType(tenv, n, pos), ref())
+       | A.RecordTy fields => (checkDups fields; Ty.RECORD(recordtys(fields), ref()))
+       | A.ArrayTy(n, pos) => Ty.ARRAY(lookType(tenv, n, pos), ref())
     end
 
     fun transExp (venv, tenv, level, loop_done_label) =
-	let fun trexp (A.NilExp) = {exp = Translate.nilExp(), ty = Types.NIL}
+	let fun trexp (A.NilExp) = {exp = Tr.nilExp(), ty = Ty.NIL}
 	  | trexp (A.VarExp var) = transVar(venv, tenv, level, loop_done_label) var
-	  | trexp (A.IntExp i) = {exp = Translate.intExp(i), ty = Types.INT} 
-	  | trexp (A.StringExp (str, pos))  = {exp = Translate.stringExp(str), ty = Types.STRING}
+	  | trexp (A.IntExp i) = {exp = Tr.intExp(i), ty = Ty.INT} 
+	  | trexp (A.StringExp (str, pos))  = {exp = Tr.stringExp(str), ty = Ty.STRING}
 	  | trexp (A.CallExp{func, args, pos}) = 
               let val trargs = map trexp args
                   val expargs = map #exp trargs
                   val tyargs = map #ty trargs
               in
                 case Symbol.look(venv, func) of
-                  SOME(Env.FunEntry{level = funcLevel, label = funcLabel, formals=tyformals, result=tyresult}) => if List.length(tyformals) <> List.length(tyargs) then (err pos ("Number of function parameters is wrong: "^Symbol.name func); {exp = Translate.nilExp(), ty=Types.UNIT})
-                                                                                                                else if compareTypeList(tyformals, tyargs, pos) then {exp = Translate.callExp(funcLevel, funcLabel, level, expargs, tyresult = Types.UNIT), ty = tyresult}
-                                                                                                                     else (err pos ("Function parameter type mismatch: " ^ Symbol.name func);{exp = Translate.nilExp(), ty = Types.UNIT})
+                  SOME(Env.FunEntry{level = funcLevel, label = funcLabel, formals=tyformals, result=tyresult}) => if List.length(tyformals) <> List.length(tyargs) then (err pos ("Number of function parameters is wrong: "^Symbol.name func); {exp = Tr.nilExp(), ty=Ty.UNIT})
+                                                                                                                else if compareTypeList(tyformals, tyargs, pos) then {exp = Tr.callExp(funcLevel, funcLabel, level, expargs, tyresult = Ty.UNIT), ty = tyresult}
+                                                                                                                     else (err pos ("Function parameter type mismatch: " ^ Symbol.name func);{exp = Tr.nilExp(), ty = Ty.UNIT})
                   | _  => (err pos ("Undefined function: " ^ Symbol.name func);
-                      {exp = Translate.nilExp(), ty = Types.UNIT}) 
+                      {exp = Tr.nilExp(), ty = Ty.UNIT}) 
               end
 	  | trexp (A.OpExp{left, oper, right, pos})  =
               let val {exp = expleft, ty = tyleft} = trexp left
@@ -129,27 +132,27 @@ structure Semant :> SEMANT = struct
                                             else "error"
               in        
                   case operType of
-                    "math" => if (checkInt(tyleft, pos, "Calculation") andalso checkInt(tyright, pos, "Calculation")) then {exp = Translate.binop(oper, expleft, expright), ty = Types.INT}
-                              else {exp = (Translate.nilExp()), ty = Types.UNIT}
+                    "math" => if (checkInt(tyleft, pos, "Calculation") andalso checkInt(tyright, pos, "Calculation")) then {exp = Tr.binop(oper, expleft, expright), ty = Ty.INT}
+                              else {exp = (Tr.nilExp()), ty = Ty.UNIT}
                    | "inequality" => (case tyleft of
-                                      Types.INT => if checkInt(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                   else {exp = Translate.nilExp(), ty = Types.UNIT}
-		                    | Types.STRING => if checkString(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                      else {exp = Translate.nilExp(), ty = Types.UNIT}  
-                                    | _  => (err pos "Can't compare inequality";{exp = Translate.nilExp(), ty = Types.UNIT}))
+                                      Ty.INT => if checkInt(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                   else {exp = Tr.nilExp(), ty = Ty.UNIT}
+		                    | Ty.STRING => if checkString(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                      else {exp = Tr.nilExp(), ty = Ty.UNIT}  
+                                    | _  => (err pos "Can't compare inequality";{exp = Tr.nilExp(), ty = Ty.UNIT}))
 	           | "equality" => (case tyleft of
-                                     Types.INT => if checkInt(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                  else {exp = Translate.nilExp(), ty = Types.UNIT}
-		                    | Types.STRING => if checkString(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                      else {exp = Translate.nilExp(), ty = Types.UNIT}  
-                                    | Types.RECORD(slist, unique) => if ((tyright = Types.NIL) orelse (checkRecord(tyright, pos, "Comparison"))) then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                                     else {exp = Translate.nilExp(), ty = Types.UNIT}
-                                    | Types.ARRAY(ty, unique) => if checkArray(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                                 else {exp = Translate.nilExp(), ty = Types.UNIT}
-                                    | Types.NIL => if checkRecord(tyright, pos, "Comparison") then {exp = Translate.relop(oper, expleft, expright),  ty = Types.INT}
-                                                   else {exp = Translate.nilExp(), ty = Types.UNIT}
-			            | _  => (err pos "Can't compare equality";{exp = Translate.nilExp(), ty = Types.UNIT}))
-	            | _  =>    (err pos "Illegal comparison operator";{exp = Translate.nilExp(), ty = Types.UNIT})
+                                     Ty.INT => if checkInt(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                  else {exp = Tr.nilExp(), ty = Ty.UNIT}
+		                    | Ty.STRING => if checkString(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                      else {exp = Tr.nilExp(), ty = Ty.UNIT}  
+                                    | Ty.RECORD(slist, unique) => if ((tyright = Ty.NIL) orelse (checkRecord(tyright, pos, "Comparison"))) then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                                     else {exp = Tr.nilExp(), ty = Ty.UNIT}
+                                    | Ty.ARRAY(ty, unique) => if checkArray(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                                 else {exp = Tr.nilExp(), ty = Ty.UNIT}
+                                    | Ty.NIL => if checkRecord(tyright, pos, "Comparison") then {exp = Tr.relop(oper, expleft, expright),  ty = Ty.INT}
+                                                   else {exp = Tr.nilExp(), ty = Ty.UNIT}
+			            | _  => (err pos "Can't compare equality";{exp = Tr.nilExp(), ty = Ty.UNIT}))
+	            | _  =>    (err pos "Illegal comparison operator";{exp = Tr.nilExp(), ty = Ty.UNIT})
               end
 	  | trexp (A.RecordExp{fields, typ, pos})  = 
               let val tyrecord = lookType(tenv, typ, pos)
@@ -159,17 +162,17 @@ structure Semant :> SEMANT = struct
                   val expfields = map #exp trfields
               in
                 case tyrecord of
-                  Types.RECORD(slist, unique) => let val decfieldnames = map #1 slist
+                  Ty.RECORD(slist, unique) => let val decfieldnames = map #1 slist
                                                      val decfieldtypes = map actual_ty (map #2 slist)
                                                  in
-                                                   if decfieldnames = fieldnames then if compareTypeList(decfieldtypes, tyfields, pos) then {exp = Translate.recordExp(expfields), ty = tyrecord}                                    
+                                                   if decfieldnames = fieldnames then if compareTypeList(decfieldtypes, tyfields, pos) then {exp = Tr.recordExp(expfields), ty = tyrecord}                                    
                                                                                       else (err pos ("Record field types mismatch: " ^ Symbol.name typ);
-                                                                                            {exp = Translate.nilExp(), ty = Types.UNIT}) 
+                                                                                            {exp = Tr.nilExp(), ty = Ty.UNIT}) 
                                                    else (err pos ("Record field names mismatch: " ^ Symbol.name typ);
-                                                         {exp = Translate.nilExp(), ty = Types.UNIT})
+                                                         {exp = Tr.nilExp(), ty = Ty.UNIT})
                                                  end
 	       | _ =>  (err pos ("Undefined record: " ^ Symbol.name typ);
-                        {exp = Translate.nilExp(),  ty = Types.UNIT})
+                        {exp = Tr.nilExp(),  ty = Ty.UNIT})
             end
 	| trexp (A.SeqExp expposList)  =
             let val expList = map #1 expposList
@@ -179,56 +182,56 @@ structure Semant :> SEMANT = struct
                 val length = List.length(expexpList) 
             in  
                case length of
-                  0 => {exp = Translate.nilExp(), ty = Types.UNIT}
-		| _  => {exp = Translate.seqExp(List.take(expexpList, length - 1), List.last(expexpList)),  ty = List.last(tyexpList)}
+                  0 => {exp = Tr.nilExp(), ty = Ty.UNIT}
+		| _  => {exp = Tr.seqExp(List.take(expexpList, length - 1), List.last(expexpList)),  ty = List.last(tyexpList)}
             end
 	| trexp (A.AssignExp{var, exp, pos})  =
             let val {exp = expspec, ty = tyspec} = transVar(venv, tenv, level, loop_done_label) var
                 val {exp = expactual, ty = tyactual} = trexp exp
             in 
-              if compareTypePair(tyspec, tyactual, pos) then {exp = Translate.assignExp(expspec, expactual),  ty = Types.UNIT}
+              if compareTypePair(tyspec, tyactual, pos) then {exp = Tr.assignExp(expspec, expactual),  ty = Ty.UNIT}
               else (err pos "Assignment type mismatch";
-                   {exp = Translate.nilExp(), ty = Types.UNIT})
+                   {exp = Tr.nilExp(), ty = Ty.UNIT})
             end
 	| trexp (A.IfExp{test, then', else', pos}) =
             let val {exp = exptest, ty = tytest} = trexp test
                 val {exp = expthen', ty = tythen'} = trexp then'
             in
               case else' of 
-                NONE => if (checkInt(tytest, pos, "If condition") andalso checkUnit(tythen', pos, "Then condition")) then {exp = Translate.ifthenExp(exptest, expthen'), ty = Types.UNIT}
-                        else {exp = Translate.nilExp(), ty = Types.UNIT}
+                NONE => if (checkInt(tytest, pos, "If condition") andalso checkUnit(tythen', pos, "Then condition")) then {exp = Tr.ifthenExp(exptest, expthen'), ty = Ty.UNIT}
+                        else {exp = Tr.nilExp(), ty = Ty.UNIT}
 	      | SOME(else'_exp) => 
                   let val {exp = expelse', ty = tyelse'} = trexp else'_exp
                   in
                     if checkInt(tytest, pos, "If condition") then 
-                       if compareTypePair(tythen',tyelse', pos) then {exp = Translate.ifthenelseExp(exptest, expthen', expelse'), ty = tythen'}
-                       else (err pos "Then-else type mismatch";{exp = Translate.nilExp(), ty = Types.UNIT})
-                    else {exp = Translate.nilExp(), ty = Types.UNIT}
+                       if compareTypePair(tythen',tyelse', pos) then {exp = Tr.ifthenelseExp(exptest, expthen', expelse'), ty = tythen'}
+                       else (err pos "Then-else type mismatch";{exp = Tr.nilExp(), ty = Ty.UNIT})
+                    else {exp = Tr.nilExp(), ty = Ty.UNIT}
                   end
             end
 	| trexp (A.WhileExp{test, body, pos}) =
             let val {exp = exptest, ty = tytest} = trexp test
-                val done_label = SOME(Translate.newDoneLabel())
+                val done_label = SOME(Tr.newDoneLabel())
                 val {exp = expbody, ty = tybody} = transExp(venv, tenv, level, done_label) body         
             in
-               if (checkInt(tytest, pos, "While loop condition") andalso checkUnit(tybody, pos, "While loop body")) then {exp = Translate.whileExp(exptest, expbody, done_label), ty = Types.UNIT}
-                else {exp = Translate.nilExp(), ty = Types.UNIT}
+               if (checkInt(tytest, pos, "While loop condition") andalso checkUnit(tybody, pos, "While loop body")) then {exp = Tr.whileExp(exptest, expbody, done_label), ty = Ty.UNIT}
+                else {exp = Tr.nilExp(), ty = Ty.UNIT}
             end
 	| trexp (A.ForExp{var, escape, lo, hi, body, pos}) =
             let val {exp = explo, ty = tylo} = trexp lo
                 val {exp = exphi, ty = tyhi} = trexp hi
-		val access = Translate.allocLocal level (!escape)
-                val new_venv = Symbol.enter(venv, var, Env.VarEntry{access=access,ty=Types.INT})    
-                val done_label = SOME(Translate.newDoneLabel())
+		val access = Tr.allocLocal level (!escape)
+                val new_venv = Symbol.enter(venv, var, Env.VarEntry{access=access,ty=Ty.INT})    
+                val done_label = SOME(Tr.newDoneLabel())
                 val {exp = expbody, ty = tybody} = transExp(new_venv, tenv, level, done_label) body
             in
-              if (checkInt(tylo, pos, "For loop low bound") andalso checkInt(tyhi, pos, "For loop high bound") andalso checkUnit(tybody, pos, "For loop body")) then {exp = Translate.forExp(Translate.simpleVar(access, level), explo, exphi, expbody, done_label), ty = Types.UNIT}
-              else {exp = Translate.nilExp(), ty = Types.UNIT}
+              if (checkInt(tylo, pos, "For loop low bound") andalso checkInt(tyhi, pos, "For loop high bound") andalso checkUnit(tybody, pos, "For loop body")) then {exp = Tr.forExp(Tr.simpleVar(access, level), explo, exphi, expbody, done_label), ty = Ty.UNIT}
+              else {exp = Tr.nilExp(), ty = Ty.UNIT}
             end
 	| trexp (A.BreakExp pos) = 
             if loop_done_label = NONE then (err pos "Break not inside a loop.";
-                                           {exp = Translate.nilExp(), ty = Types.UNIT})
-            else {exp = Translate.breakExp(loop_done_label), ty = Types.UNIT}
+                                           {exp = Tr.nilExp(), ty = Ty.UNIT})
+            else {exp = Tr.breakExp(loop_done_label), ty = Ty.UNIT}
 	| trexp (A.LetExp{decs, body, pos}) =
           let
 	      fun transOne(oneDec, {venv=venv, tenv=tenv, explist=initlist})=
@@ -236,7 +239,7 @@ structure Semant :> SEMANT = struct
 	      val {venv = venv', tenv = tenv', explist = explist'} = foldl transOne {venv=venv, tenv=tenv, explist=[]} decs
 	      val {exp = bodyexp, ty= bodyty} = transExp(venv',tenv', level, loop_done_label) body
           in   
-	       {exp = Translate.seqExp(List.rev(explist'), bodyexp), ty = bodyty}
+	       {exp = Tr.seqExp(List.rev(explist'), bodyexp), ty = bodyty}
           end
 	| trexp (A.ArrayExp{typ, size, init, pos})  =
             let val {exp = expsize, ty = tysize} = trexp size
@@ -245,11 +248,11 @@ structure Semant :> SEMANT = struct
             in
               if checkInt(tysize, pos, "Array size") then
                 (case tytyp of 
-                  Types.ARRAY(ty, unique) => if compareTypePair(ty, tyinit, pos) then {exp = Translate.arrayExp(expsize, expinit), ty = tytyp}
-                                             else (err pos "Array-init type mismatch";{exp = Translate.nilExp(), ty =tytyp})
+                  Ty.ARRAY(ty, unique) => if compareTypePair(ty, tyinit, pos) then {exp = Tr.arrayExp(expsize, expinit), ty = tytyp}
+                                             else (err pos "Array-init type mismatch";{exp = Tr.nilExp(), ty =tytyp})
                  |_  => (err pos ("Undefined array: "^Symbol.name typ);
-                        {exp = Translate.nilExp(), ty = Types.UNIT}))
-              else {exp = Translate.nilExp(), ty = Types.UNIT}
+                        {exp = Tr.nilExp(), ty = Ty.UNIT}))
+              else {exp = Tr.nilExp(), ty = Ty.UNIT}
             end
 	in
 	    trexp
@@ -258,23 +261,23 @@ structure Semant :> SEMANT = struct
     and transVar (venv, tenv, level, loop_done_label) =
       let fun trvar (A.SimpleVar(id, pos)) =
                 (case Symbol.look(venv, id) of
-                   SOME (Env.VarEntry{access = access, ty = ty}) => {exp = Translate.simpleVar(access, level), ty = actual_ty ty}
+                   SOME (Env.VarEntry{access = access, ty = ty}) => {exp = Tr.simpleVar(access, level), ty = actual_ty ty}
                   | _  => (err pos ("Undefined variable: " ^ Symbol.name id);
-                           {exp = Translate.nilExp(), ty = Types.UNIT}))
+                           {exp = Tr.nilExp(), ty = Ty.UNIT}))
           | trvar (A.FieldVar(var, id, pos))  =
               let val {exp = expvar, ty = tyvar} = trvar var
               in
                 case tyvar of
-                  Types.RECORD(slist, unique) => let val fieldnames = map #1 slist
+                  Ty.RECORD(slist, unique) => let val fieldnames = map #1 slist
                                                      val fieldtypes = map #2 slist
                                                      val index = indexOf(id, fieldnames)
                                                  in
                                                     if index = ~1 then (err pos ("No such field in record");
-                                                                        {exp = Translate.nilExp(), ty = Types.UNIT})
-                                                    else {exp = Translate.fieldVar(expvar, index), ty = List.nth(fieldtypes, index)}
+                                                                        {exp = Tr.nilExp(), ty = Ty.UNIT})
+                                                    else {exp = Tr.fieldVar(expvar, index), ty = List.nth(fieldtypes, index)}
                                                  end
                   | _  => (err pos ("Undefined record");
-                           {exp = Translate.nilExp(), ty = Types.UNIT})
+                           {exp = Tr.nilExp(), ty = Ty.UNIT})
                end
       | trvar (A.SubscriptVar(var, exp, pos))  = 
           let val {exp = expvar, ty = tyvar} = trvar var
@@ -282,9 +285,9 @@ structure Semant :> SEMANT = struct
           in  
             (checkInt(tyexp, pos, "Array subscript");
              case tyvar of
-               Types.ARRAY(ty, unique) => {exp = Translate.subscriptVar(expvar, expexp), ty = ty}
+               Ty.ARRAY(ty, unique) => {exp = Tr.subscriptVar(expvar, expexp), ty = ty}
              | _ => (err pos ("Undefined array");
-                     {exp = (Translate.nilExp()), ty = Types.UNIT}))
+                     {exp = (Tr.nilExp()), ty = Ty.UNIT}))
           end
       in
          trvar
@@ -297,18 +300,18 @@ structure Semant :> SEMANT = struct
                                   pos}, endLabel, level, explist)=
       let val tyinit = #ty(transExp(venv,tenv, level, endLabel) init)
 	  val exp = #exp(transExp(venv,tenv,level, endLabel) init)
-	  val access = Translate.allocLocal level (!escape)
-	  val explist' = Translate.assignExp(Translate.simpleVar(access, level), exp)::explist
+	  val access = Tr.allocLocal level (!escape)
+	  val explist' = Tr.assignExp(Tr.simpleVar(access, level), exp)::explist
       in 
-          if tyinit <> Types.NIL then {tenv = tenv, venv = Symbol.enter(venv,name,Env.VarEntry{access=access, ty = tyinit}), explist = explist'}
+          if tyinit <> Ty.NIL then {tenv = tenv, venv = Symbol.enter(venv,name,Env.VarEntry{access=access, ty = tyinit}), explist = explist'}
           else (err pos ("Non-record variable can't be initializing nil expression: " ^ Symbol.name name);{tenv = tenv, venv = venv, explist = explist})
       end
     | transDec (venv,tenv,A.VarDec{name,typ=SOME(s,pos),init, pos=pos1, escape=escape},endLable,level,explist) =
       let val tyinit = #ty(transExp (venv, tenv,level, endLable) init)
           val tys = lookType(tenv, s, pos)
           val exp = #exp(transExp(venv,tenv,level,endLable) init)
-	  val access = Translate.allocLocal level (!escape)
-	  val explist' = Translate.assignExp(Translate.simpleVar(access, level), exp)::explist
+	  val access = Tr.allocLocal level (!escape)
+	  val explist' = Tr.assignExp(Tr.simpleVar(access, level), exp)::explist
       in
           if compareTypePair(tys, tyinit,  pos) then ({tenv = tenv, venv = Symbol.enter(venv, name, Env.VarEntry{access=access, ty = tys}), explist = explist'})
           else (err pos1 ("Variable init type mismatch: " ^ Symbol.name name);({tenv = tenv, venv = Symbol.enter(venv, name, Env.VarEntry{access=access, ty = tys}), explist = explist'}))
@@ -319,17 +322,17 @@ structure Semant :> SEMANT = struct
 	  val repeat = checkname names
 	  val positions = map #pos vardecs
 	  val types = map #ty vardecs
-	  fun addnamet (name,env) = Symbol.enter(env,name,Types.NAME(name,ref(NONE)))
+	  fun addnamet (name,env) = Symbol.enter(env,name,Ty.NAME(name,ref(NONE)))
 	  val tenv' = foldr addnamet tenv names
 			    
 	  fun update (((name,typ),pos),tenv')=
 	      let val newtype = transTy (tenv',typ)
 	      in
 		  (case Symbol.look(tenv', name) of 
-		       SOME(Types.NAME(s, tref)) => (tref := SOME(newtype); tenv')
+		       SOME(Ty.NAME(s, tref)) => (tref := SOME(newtype); tenv')
 		     | _ => (err pos "Error defining types"; tenv'))
 	      end
-	  fun finalize (((name,typ),pos),tenv'': Types.ty Symbol.table) =
+	  fun finalize (((name,typ),pos),tenv'': Ty.ty Symbol.table) =
 	      let val counter = List.length(names)
 		  fun determine (name:Symbol.symbol, count:int) =
 		      let val counting : int ref= ref(count)			     
@@ -338,10 +341,10 @@ structure Semant :> SEMANT = struct
 			  if !counting < 0 then (err pos "Error with mutually recursive types";tenv'')
 			  else (case Symbol.look(tenv'',name) of
 				    NONE => (err pos "Error with NONE type";tenv'')
-				   |SOME(Types.NAME(s,nref))=> (case !nref of
+				   |SOME(Ty.NAME(s,nref))=> (case !nref of
 								    NONE => (err pos "Error with NONE type";tenv'')
-								   |SOME(rtyp: Types.ty)=> (case rtyp of
-												Types.NAME(n,aref) => (determine(n,!counting))
+								   |SOME(rtyp: Ty.ty)=> (case rtyp of
+												Ty.NAME(n,aref) => (determine(n,!counting))
 											       |_=>(Symbol.enter(tenv'',name,rtyp))))
 				   | _ => tenv'')
 		      end 
@@ -359,7 +362,7 @@ structure Semant :> SEMANT = struct
       let fun firstpass ({name=name, params=params, body=body, pos=pos, result=result},tempvenv) =
 	      let val result_ty = case result of
                                       SOME(rt, position) => lookType(tenv, rt, pos)
-				     |NONE => Types.UNIT 
+				     |NONE => Ty.UNIT 
 		  fun transparam (field:A.field) =
 		      let val name = #name field
 			  val typ = #typ field
@@ -371,7 +374,7 @@ structure Semant :> SEMANT = struct
 
 		  fun getEscape(field:A.field)= !(#escape field)
 		  val newLabel = Temp.newlabel()
-		  val newLevel = Translate.newLevel {parent = level, name = newLabel, formals = (map getEscape params)}
+		  val newLevel = Tr.newLevel {parent = level, name = newLabel, formals = (map getEscape params)}
 	      in
 		  Symbol.enter(tempvenv, name, Env.FunEntry{formals = map #ty params', result = result_ty, level = newLevel, label = newLabel})
 	      end  
@@ -388,7 +391,7 @@ structure Semant :> SEMANT = struct
 		  val result = #result fundec
 		  val tyret = case result of 
 				  SOME(rt,p) => lookType(tenv,rt, p)
-				| NONE => Types.UNIT
+				| NONE => Ty.UNIT
 		  val funcentry = case Symbol.look(venv,name) of
 				      SOME(Env.FunEntry funcentry) => funcentry
 				     |_ => ErrorMsg.impossible "function not found in the environment" 
@@ -403,12 +406,12 @@ structure Semant :> SEMANT = struct
 			  val ty = lookType(tenv,typ,pos)
 		      in
 			  (ErrorMsg.impossible "Didn't allocate param earlier";
-			   (Symbol.enter (venv, name, Env.VarEntry {access = Translate.allocLocal (#level funcentry) (!escape), ty = ty}), []))
+			   (Symbol.enter (venv, name, Env.VarEntry {access = Tr.allocLocal (#level funcentry) (!escape), ty = ty}), []))
 		      end							    
 										    
-		  val (venv'',_) = foldr enterparam (venv', List.drop(Translate.formals (#level funcentry),0)) params 
+		  val (venv'',_) = foldr enterparam (venv', List.drop(Tr.formals (#level funcentry),0)) params 
 		  val {exp=bodyexp , ty=bodytype} = transExp(venv'',tenv, (#level funcentry), endlabel) body
-		  val result = Translate.procEntryExit({level = (#level funcentry), body = bodyexp})
+		  val result = Tr.procEntryExit({level = (#level funcentry), body = bodyexp})
 	      in
 		  
 		  case compareTypePair(bodytype, tyret, pos) of
@@ -425,12 +428,12 @@ structure Semant :> SEMANT = struct
     | transDec(venv,tenv, A.Initial(), endLabel, level, explist) = {venv = venv, tenv=tenv, explist = explist}
 				  
 	fun transProg(absyn) = 
-	    let val reset = Translate.reset()
-                val mainLevel = Translate.mainLevel
+	    let val reset = Tr.reset()
+                val mainLevel = Tr.mainLevel
 	        val mainLabel = SOME(Temp.newlabel())
-		val result = transExp (Env.base_venv, Env.base_tenv, Translate.mainLevel, mainLabel) absyn; 
+		val result = transExp (Env.base_venv, Env.base_tenv, Tr.mainLevel, mainLabel) absyn; 
 	    in
-                Translate.procEntryExit({level = mainLevel, body = #exp result});
-		Translate.getResult()
+                Tr.procEntryExit({level = mainLevel, body = #exp result});
+		Tr.getResult()
 	    end
 end

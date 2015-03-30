@@ -242,8 +242,8 @@ struct
              T.CJUMP(T.LE, var, hi, body_label, done_label),
              T.LABEL body_label,
              unNx body,
-             T.CJUMP(T.LT, var, hi, body_label, done_label),
              T.MOVE(var, T.BINOP(T.PLUS, var, T.CONST 1)),
+             T.CJUMP(T.LT, var, hi, body_label, done_label),
              T.LABEL done_label
              ])
     end

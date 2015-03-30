@@ -1,0 +1,49 @@
+MOVE(
+ TEMP t148,
+ CONST 0)
+MOVE(
+ TEMP t149,
+ CONST 0)
+CJUMP(LE,
+ TEMP t149,
+ CONST 100,
+ L20,L19)
+LABEL L20
+MOVE(
+ TEMP t148,
+ BINOP(PLUS,
+  TEMP t148,
+  CONST 1))
+MOVE(
+ TEMP t149,
+ BINOP(PLUS,
+  TEMP t149,
+  CONST 1))
+CJUMP(LT,
+ TEMP t149,
+ CONST 100,
+ L20,L19)
+LABEL L19
+MOVE(
+ TEMP t104,
+ CONST 0)
+L22:
+li t148, 0
+li t149, 0
+li t150, 100
+ble t149, t150, L20
+b L19
+L19:
+li t104, 0
+b L21
+L20:
+addi t151, t148, 1
+move t148, t151
+addi t152, t149, 1
+move t149, t152
+li t153, 100
+blt t149, t153, L20
+b L23
+L23:
+b L19
+L21:

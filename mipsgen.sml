@@ -33,16 +33,16 @@ fun codegen (stm:T.stm) : A.instr list =
 	| munchStm (T.MOVE(T.TEMP t, T.CONST i)) = emit(A.OPER{assem = "li `d0, " ^ tostring i ^ "\n",
                                                                src =[], dst = [t], jump = NONE})
         (*lw*)
-	| munchStm (T.MOVE(T.TEMP t, T.BINOP(T.PLUS, e, T.CONST i))) = emit(A.OPER{assem = "lw `d0, " ^ tostring i ^ "(`s0)\n",
+	| munchStm (T.MOVE(T.TEMP t, T.MEM(T.BINOP(T.PLUS, e, T.CONST i)))) = emit(A.OPER{assem = "lw `d0, " ^ tostring i ^ "(`s0)\n",
                                                                                     src =[munchExp e], dst = [t], jump = NONE})
-	| munchStm (T.MOVE(T.TEMP t, T.BINOP(T.PLUS, T.CONST i, e))) = emit(A.OPER{assem = "lw `d0, " ^ tostring i ^ "(`s0)\n",
+	| munchStm (T.MOVE(T.TEMP t, T.MEM(T.BINOP(T.PLUS, T.CONST i, e)))) = emit(A.OPER{assem = "lw `d0, " ^ tostring i ^ "(`s0)\n",
                                                                                     src =[munchExp e], dst = [t], jump = NONE})
-	| munchStm (T.MOVE(T.TEMP t, T.BINOP(T.MINUS, e, T.CONST i))) = emit(A.OPER{assem = "lw `d0, " ^ Int.toString (~i) ^ "(`s0)\n",
+	| munchStm (T.MOVE(T.TEMP t, T.MEM(T.BINOP(T.MINUS, e, T.CONST i)))) = emit(A.OPER{assem = "lw `d0, " ^ Int.toString (~i) ^ "(`s0)\n",
                                                                                      src =[munchExp e], dst = [t], jump = NONE})
-	| munchStm (T.MOVE(T.TEMP t, T.BINOP(T.MINUS, T.CONST i, e))) = emit(A.OPER{assem = "lw `d0, " ^ Int.toString (~i) ^ "(`s0)\n",
+	| munchStm (T.MOVE(T.TEMP t, T.MEM(T.BINOP(T.MINUS, T.CONST i, e)))) = emit(A.OPER{assem = "lw `d0, " ^ Int.toString (~i) ^ "(`s0)\n",
                                                                                      src =[munchExp e], dst = [t], jump = NONE})
         (*move*)
-        | munchStm (T.MOVE(T.TEMP t, e)) = emit(A.MOVE{assem = "move `d0, 0(`s0)\n", 
+        | munchStm (T.MOVE(T.TEMP t, e)) = emit(A.MOVE{assem = "move `d0, `s0\n", 
                                                        src = munchExp e, dst = t})
         (*unconditional branch*)
 	| munchStm (T.JUMP(T.NAME lab, _)) = emit(A.OPER{assem = "b `j0\n",
@@ -96,9 +96,9 @@ fun codegen (stm:T.stm) : A.instr list =
         | munchExp (T.MEM(e)) = result(fn r => emit(A.OPER{assem = "lw `d0, 0(`s0)\n",
                                                             src = [munchExp e], dst = [r],jump = NONE}))
         (*add*)
-        | munchExp (T.BINOP(T.PLUS, e, T.CONST i)) = result(fn r => emit(A.OPER{assem = "addi `d0, `s0" ^ tostring i ^ "\n",
+        | munchExp (T.BINOP(T.PLUS, e, T.CONST i)) = result(fn r => emit(A.OPER{assem = "addi `d0, `s0, " ^ tostring i ^ "\n",
     src = [munchExp e],dst = [r],jump = NONE}))
-        | munchExp (T.BINOP(T.PLUS, T.CONST i, e)) = result(fn r => emit(A.OPER{assem = "addi `d0, `s0" ^ tostring i ^ "\n",
+        | munchExp (T.BINOP(T.PLUS, T.CONST i, e)) = result(fn r => emit(A.OPER{assem = "addi `d0, `s0, " ^ tostring i ^ "\n",
     src = [munchExp e],dst = [r],jump = NONE}))                            
         | munchExp (T.BINOP(T.PLUS, e1, e2)) =  result(fn r => emit(A.OPER{assem = "add `d0, `s0, `s1\n",
                                                                            src = [munchExp e1, munchExp e2],dst = [r],jump = NONE}))

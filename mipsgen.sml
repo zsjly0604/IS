@@ -72,7 +72,7 @@ fun codegen (stm:T.stm) : A.instr list =
                                                                  src = [munchExp e1, munchExp e2], dst = [], jump = SOME([l1, l2])})                   
         | munchStm (T.CJUMP(T.EQ, e1, e2, l1, l2)) = emit(A.OPER{assem = "beq `s0, `s1, `j0\nb `j1\n",
                                                                  src = [munchExp e1, munchExp e2], dst = [], jump = SOME([l1, l2])})
-	| munchStm (T.CJUMP(T.NE, e1, e2, l1, l2)) = emit(A.OPER{assem = "bne `s0, `s1, `j0\b `j1\n",
+	| munchStm (T.CJUMP(T.NE, e1, e2, l1, l2)) = emit(A.OPER{assem = "bne `s0, `s1, `j0\nb `j1\n",
                                                                  src = [munchExp e1, munchExp e2], dst = [], jump = SOME([l1, l2])})           
 	| munchStm (T.EXP(T.CALL(T.NAME(lab), args))) = 
             let val pairs = map (fn r => (Temp.newtemp(), r)) (map #1 Frame.callersaves)
